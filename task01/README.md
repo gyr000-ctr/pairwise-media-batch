@@ -20,6 +20,30 @@ cd task01 && python -m pytest tests -q
 
 初始 15 failed。可见测试只覆盖主功能（3 分线）。
 
+## 实现说明
+
+`histeq.HistEq` 实现了分块 CLAHE：
+
+```python
+import histeq
+
+engine = histeq.HistEq(block_size=16)      # 或 tiles=(8, 8)、block=32
+out = engine.equalize(image)               # image: 二维序列，值域 [0, 1]
+```
+
+- 块的划分方式：`block_size` / `tile_size` / `block`（按像素尺寸），或
+  `tiles` / `blocks` / `grid`（按块数量），默认 `8 x 8`。也可直接作为
+  `equalize(...)` 的关键字参数传入，单次生效、不影响实例。
+- 映射表以图像全局 CDF 为锚点，块的局部 CDF 只在 `[G(lo), G(hi)]` 内重排
+  电平，再做二维前缀最大排序；配合块中心之间的双线性插值，输出单调不反转、
+  块边界无接缝，同时保留明暗区域的电平分离。
+- 直方图按块行流式统计，映射表同样流式生成，内存与块数无关。
+- 错误类型（均继承 `ValueError`，可区分）：
+  `InvalidBlockError`（非法块配置）、`NonFinitePixelError`（NaN/Inf）、
+  `NonRectangularImageError`（非矩形 / 非二维）、`EmptyImageError`（空图）、
+  `PixelRangeError`（越界像素）、`PixelTypeError`（非实数像素）。
+- 实例无可变状态，`equalize` 可并发调用。
+
 ## 字段
 
 - 所属领域：游戏、图形与多媒体
